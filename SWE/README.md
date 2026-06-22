@@ -46,8 +46,8 @@ SWE/
 │   ├── attacks/              模块四:classic.py(经典失真) + ai.py(AI 再生成)
 │   ├── eval/                 模块五:metrics.py  runner.py  plots.py
 │   └── data/datasets.py      图像加载/划分
-├── scripts/                  01..08 入口脚本(见下)
-├── tests/                    pytest 单元测试(39 项)
+├── scripts/                  01..09 入口脚本(见下)
+├── tests/                    pytest 单元测试(50 项)
 ├── data/samples/             样例图(sample.jpg, bees.png)
 └── docs/                     ARCHITECTURE.md  EXPERIMENTS.md
 ```
@@ -81,18 +81,19 @@ pip install -r requirements-deep.txt
 
 ---
 
-## 4. 快速上手(8 个脚本)
+## 4. 快速上手(9 个脚本;每个 demo 末尾都有"自动判定"——结论由实测算出、非预设)
 
 ```bash
 cd SWE
-python scripts/01_test_jpeg_codec.py          # ① 自实现 JPEG vs PIL 校准(PSNR/bpp)
-python scripts/02_demo_classic_watermarks.py  # ② 8 种经典水印:PSNR + 干净/攻击后准确率
-python scripts/03_demo_dct_qim_jpeg.py        # ③ DCT-QIM 嵌入 JPEG 流水线 + ECC 信息恢复
-python scripts/04_demo_fragile_tamper.py      # ④ 脆弱/半脆弱水印篡改定位(出四联热图)
+python scripts/01_test_jpeg_codec.py          # ① 自实现 JPEG vs PIL 校准(自动 PASS/FAIL 判定)
+python scripts/02_demo_classic_watermarks.py  # ② 8 种经典水印:按三攻击均值自动分档(弱/强)
+python scripts/03_demo_dct_qim_jpeg.py        # ③ DCT-QIM 嵌 JPEG 流水线 + ECC(自动判定是否扛再压/ECC增益)
+python scripts/04_demo_fragile_tamper.py      # ④ 脆弱/半脆弱篡改定位(自动判定 误报/IoU/F1)
 python scripts/05_train_deep_watermark.py --smoke   # ⑤ 训练深度水印(CPU 冒烟,~3 分钟)
-python scripts/06_demo_deep_watermark.py      # ⑥ 深度水印 embed/extract + 鲁棒性快测
+python scripts/06_demo_deep_watermark.py      # ⑥ 深度水印 vs DWT-SVD 经典基线 同攻击对照 + 自动判定
 python scripts/07_run_attack_suite.py --include-deep # ⑦ 方法×攻击×强度全套实验 -> CSV
 python scripts/08_make_report_figures.py      # ⑧ 由 CSV 生成三张核心图表
+python scripts/09_diagnose_frequency_survival.py  # ⑨ 主线 P1:频带存活诊断(决定改进 DwtDct 往哪嵌)
 ```
 
 正式训练(需 GPU + diffusers,RoSteALS 正路):
@@ -125,10 +126,11 @@ python scripts/05_train_deep_watermark.py --data-dir /path/to/DIV2K \
   **`embed_in_jpeg()` 真实输出** PSNR≈30 dB(含 JPEG Q50 压缩损失,≈Q50 基线画质),bpp≈0.74;**同质量 JPEG 再压缩后比特准确率 1.00**。
 - **半脆弱水印**:benign JPEG70–90 误报 0%,可定位平涂/自然重绘(~55/64 块)。
 - **Reed–Solomon**:nsym=10 时纠正 ≤5 字节错 100%,6 字节失败(符合 t=5 理论上限)。
-- **深度潜空间水印(tiny VAE,128px,~400 步)**:训练 bit_acc 由 ~0.5 升至 **0.93–1.0**(随种子/步数波动);
-  推理对 JPEG / 再生成代理攻击留存率 **≈1.0**、对模糊/噪声 ≈0.97 —— 而经典法在再生成代理下跌向 ~0.5,
-  复现 VINE "攻击层入环 → 抗 AI 编辑" 的核心结论。
-- **单元测试**:`pytest` 39 项全过。
+- **深度潜空间水印(tiny VAE,128px,~400 步冒烟)**:训练 bit_acc 由 ~0.5 升至 **~0.8**(随种子/步数波动)。
+  `scripts/06` 现以 **DWT-SVD 经典基线**同图/同攻击对照并自动判定:在**纯 CPU 代理攻击 `regen_surrogate` 下两者留存率相当(~0.8),
+  冒烟阶段并未拉开"深度>经典"差距**(脚本如实打印"不明显")。VINE"攻击层入环→抗 AI 编辑"的优势需
+  **真扩散(GPU)或冻结 SD-VAE 充分训练**才显现 —— 故深度仅作**上界基线**、代理攻击只是下界。
+- **单元测试**:`pytest` 50 项全过。
 
 > 完整复现步骤与预期数值见 `docs/EXPERIMENTS.md`;设计/算法/出处映射见 `docs/ARCHITECTURE.md`。
 

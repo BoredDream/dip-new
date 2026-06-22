@@ -34,6 +34,7 @@ def main(path=config.DEFAULT_SAMPLE):
     g = load_gray(path, size=256, multiple_of=8).astype(np.float64)
     bs = 8
 
+    M = {}
     for cls, label in [(FragileWatermark, "fragile"), (SemiFragileWatermark, "semifragile")]:
         wm_obj = cls(block=bs)
         wm = to_uint8(wm_obj.embed(g))
@@ -51,17 +52,34 @@ def main(path=config.DEFAULT_SAMPLE):
         i, f = iou(tmap, gt), f1_score(tmap, gt)
 
         clean_fp = int(wm_obj.verify(wm.astype(np.float64)).sum())
+        rec = dict(clean_fp=clean_fp, iou=i, f1=f, benign_fp_rate=None)
         print(f"[{label}] clean误报={clean_fp}块  篡改后 IoU={i:.2f} F1={f:.2f}")
         if label == "semifragile":
             jp = wm_obj.verify(jpeg_recompress(wm, 80).astype(np.float64))
-            print(f"           benign JPEG80 误报率={100*jp.mean():.1f}%")
+            rec["benign_fp_rate"] = float(jp.mean())
+            print(f"           benign JPEG80 误报率={100 * rec['benign_fp_rate']:.1f}%")
+        M[label] = rec
 
         gt_heat = tamper_heatmap(gt, g.shape, bs)
         plot_tamper_panel(wm, att_in, heat, os.path.join(out_dir, f"{label}_panel.png"),
                           gt_mask=gt_heat, iou=i, f1=f)
 
     print(f"\n四联图已保存到: {out_dir}")
-    print("结论:脆弱水印精确定位任何改动;半脆弱容忍 benign JPEG、仍能定位重绘区域。")
+
+    # —— 自动判定:下面结论均由上方实测的 误报数/IoU/F1 按明确判据算出,不写死 ——
+    LOC_TH = 0.30          # 块级篡改定位 F1 达标线(含 JPEG 扰动,>0.3 视为有效定位)
+    FP_TH = 0.05           # benign JPEG 误报率上限(<=5% 视为"容忍良性压缩、不误报")
+    fr, sf = M["fragile"], M["semifragile"]
+    fragile_ok = (fr["clean_fp"] == 0 and fr["f1"] >= LOC_TH)
+    sf_tolerant = (sf["benign_fp_rate"] is not None and sf["benign_fp_rate"] <= FP_TH)
+    sf_locates = (sf["f1"] >= LOC_TH)
+    print("\n== 自动判定(依据上方实测值,非预设结论)==")
+    print(f"[1] 脆弱水印精确定位: {'成立' if fragile_ok else '不成立'} "
+          f"(clean误报={fr['clean_fp']}块[需=0],篡改F1={fr['f1']:.2f}[需>={LOC_TH}])")
+    print(f"[2] 半脆弱容忍benign JPEG: {'成立' if sf_tolerant else '不成立'} "
+          f"(JPEG80误报率={100 * (sf['benign_fp_rate'] or 0):.1f}%[需<={100 * FP_TH:.0f}%])")
+    print(f"[3] 半脆弱仍能定位重绘区: {'成立' if sf_locates else '不成立'} "
+          f"(篡改F1={sf['f1']:.2f}[需>={LOC_TH}])")
 
 
 if __name__ == "__main__":

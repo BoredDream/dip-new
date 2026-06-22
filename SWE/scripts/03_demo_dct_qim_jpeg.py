@@ -26,6 +26,7 @@ def main(path=config.DEFAULT_SAMPLE):
     print("== A. DCT-QIM 嵌入 JPEG 压缩流水线 ==")
     img = load_image(path, size=256, multiple_of=16)
     bits = random_bits(100)
+    recompress = {}
     for q in (50, 30):
         wm = DCTQIMJPEGWatermark(quality=q, repeat=4)
         wm_img, stream = wm.embed_in_jpeg(img, bits)
@@ -34,6 +35,7 @@ def main(path=config.DEFAULT_SAMPLE):
         # 再过一次同质量 JPEG(模块一)
         Yj = rgb_to_ycbcr(jpeg_recompress(wm_img, q))[..., 0]
         rej = bit_accuracy(bits, wm.extract(Yj, 100))
+        recompress[q] = rej
         print(f"  Q={q}: bpp={stream.bpp:.3f} PSNR={psnr(img, wm_img):.1f}dB "
               f"Δ={wm.delta:.0f} | clean={clean:.2f} JPEG{q}再压={rej:.2f}")
 
@@ -61,8 +63,20 @@ def main(path=config.DEFAULT_SAMPLE):
     print(f"  无 ECC: 提取比特准确率={raw_acc:.3f}  ->  ID 完整恢复={raw_ok}")
     print(f"  有 ECC: 提取比特准确率={bit_accuracy(coded, ext_coded):.3f}  "
           f"-> RS 纠错后 ID 完整恢复={ecc_ok}")
-    print("\n结论:DCT-QIM 嵌在 JPEG 流水线内可扛同质量再压缩;ECC 把'差几位'纠回,"
-          "把比特准确率转化为'信息完整恢复'。")
+
+    # —— 自动判定:下面结论均由上方实测值算出,不写死预设结论 ——
+    REJ_TH = 0.98                                  # 同质量再压后达标线(QIM 取 Δ≈3×量化步长的设计目标)
+    recompress_ok = all(v >= REJ_TH for v in recompress.values())
+    print("\n== 自动判定(依据上方实测值)==")
+    print(f"[A] DCT-QIM 抗同质量再压缩: {'成立' if recompress_ok else '不成立'} "
+          f"(各 Q 再压后准确率 {{{', '.join(f'Q{q}={v:.2f}' for q, v in recompress.items())}}},判据>={REJ_TH})")
+    if ecc_ok and not raw_ok:
+        verdict_b = "成立 —— 无 ECC 时 ID 已损坏、加 RS 后完整恢复,把'差几位'纠成了'信息完整'"
+    elif ecc_ok and raw_ok:
+        verdict_b = "本次攻击偏轻:无 ECC 也恰好整段正确,未能体现 ECC 增益(可调大攻击强度复现差异)"
+    else:
+        verdict_b = f"未成立:攻击超出 RS 纠错上限(t={rs.nsym // 2} 字节/块),ID 未能完整恢复"
+    print(f"[B] ECC 信息恢复价值: {verdict_b}")
 
 
 if __name__ == "__main__":

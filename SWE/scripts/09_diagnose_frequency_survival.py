@@ -76,12 +76,19 @@ def main():
             for si, s in enumerate(strengths):
                 w.writerow([k, s, f"{diag.abs_disturb[k, si]:.6f}", f"{diag.rel_disturb[k, si]:.6f}"])
 
-    # 结论
-    print("\n===== 诊断结论(最温和强度 = 最具威胁的攻击)=====")
-    print(f"DwtDct 默认嵌入频带 = #{diag.default_band}(中频),"
-          f"稳定性排名第 {rank}/{n_band}(1=最稳;排名越靠后越是'重灾区')。")
-    print(f"推荐改嵌的稳定频带(按相对扰动从小到大)= {rec}")
-    print("注意:最稳的频带往往偏低频 -> 直接嵌会偏可见 -> 这正是 P2 要加 JND 自适应的原因。")
+    # —— 诊断结论:下面每条都由实测的 rel_disturb 排名 / 推荐频带位置算出,不写死 ——
+    print("\n===== 诊断结论(由实测推导,最温和强度 = 最具威胁的攻击)=====")
+    default_off = rank > len(rec)            # 默认频带不在最稳的前 k 名 -> 选位偏差
+    print(f"[1] DwtDct 默认嵌入频带 = #{diag.default_band}(中频),稳定性排名第 {rank}/{n_band}"
+          f"(1=最稳)-> 判定: 默认位置{'选得偏(非最稳区,值得改嵌)' if default_off else '已接近最稳区'}。")
+    print(f"[2] 推荐改嵌的稳定频带(相对扰动最小的前 {len(rec)} 个)= {rec}")
+    # 推荐频带是否集中在低频区(zigzag 越小越低频)-> 决定会不会撞"可见性的墙"
+    LOWFREQ_MAX = 12                         # zigzag<=12 视为低频区(8x8 共 64 个频带)
+    rec_max = max(rec) if rec else -1
+    lowfreq = rec_max <= LOWFREQ_MAX
+    print(f"[3] 可见性判定: 推荐频带最大 zigzag={rec_max} {'<=' if lowfreq else '>'} {LOWFREQ_MAX} -> "
+          + ("确属低频区,该频带幅值大、直接线性嵌入会偏可见 -> P2 必须用 JND/纹理自适应压可见性"
+             if lowfreq else "未集中于低频,可见性压力较小"))
     print(f"\n[OK] 图: {png}")
     print(f"[OK] 数据: {csv_path}")
     print("下一步 P2:用上面推荐频带 + 纹理自适应强度 + JND 重写 DwtDct(ImprovedDwtDct)。")

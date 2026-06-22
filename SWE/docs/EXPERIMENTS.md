@@ -26,8 +26,9 @@ python scripts/01_test_jpeg_codec.py
 ```bash
 python scripts/02_demo_classic_watermarks.py
 ```
-**预期**:8 种方法干净准确率均 1.00;JPEG50/噪声/模糊后,LSB/DCT/DFT 明显跌向 0.5,
-SVD/DWT-SVD/扩频较稳。结果图写入 `results/classic/`。
+**预期**:8 种方法干净准确率均 1.00(文本完整还原)。攻击后鲁棒性由 `02` 末尾**自动判定**
+按"三攻击(JPEG50/噪声σ10/模糊1.5)均值"实测分档(<0.65=弱基线 / ≥0.85=鲁棒),**不预设结论**——
+实测倾向:LSB/DCT/DFT 等接近随机(弱基线)、扩频最鲁棒,但**具体分档以脚本实际打印为准**。结果图写入 `results/classic/`。
 
 ## 3. DCT-QIM 嵌入 JPEG + ECC(脚本 03)
 
@@ -73,8 +74,10 @@ python scripts/08_make_report_figures.py
 - `sweep_<attack>.png`：各攻击的强度衰减曲线(标 0.5 随机基线);
 - `tradeoff.png`：攻防权衡(横轴画面改变量、纵轴 BER,标"水印死但图还像"的危险区)。
 
-**预期结论**:经典 DCT-QIM 抗 JPEG 强、但在 `regen_surrogate` 强度上升时跌向 0.5;
-深度潜空间水印在再生成代理攻击下留存率更高 —— 即"经典抗压缩、深度抗再生成"的互补结论。
+**预期结论(以图表与 `06`/`07` 实测自动判定为准,不预设)**:经典 DCT-QIM / DWT-SVD **抗 JPEG/压缩类攻击强**;
+而 `regen_surrogate` 是**纯 CPU 代理(模糊+重采样+JPEG+噪声),强度有限,实测下经典水印仍扛得住(留存 ~0.9+)**,
+因此**冒烟阶段"经典抗压缩、深度抗再生成"的互补差距并不明显**(`06` 会如实判定深度 vs 经典"不明显")。
+要真正拉开"深度 > 经典"的差距,需 **真扩散 img2img(GPU)或冻结 SD-VAE 充分训练** —— 代理攻击只给下界。
 
 ---
 

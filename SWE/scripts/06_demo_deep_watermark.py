@@ -14,7 +14,8 @@ import numpy as np
 from swe.watermark.deep.model import build_latent_watermark, load_latent_watermark
 from swe.watermark.deep.train import train_deep_watermark
 from swe.watermark.utils import random_bits, text_to_bits, bits_to_text
-from swe.data.datasets import load_image, save_image, list_images
+from swe.data.datasets import load_image, save_image, list_images, to_uint8
+from swe.watermark.classic import DWTSVDWatermark
 from swe.attacks.classic import jpeg_recompress, gaussian_blur, gaussian_noise
 from swe.attacks.ai import regeneration_surrogate
 from swe.eval.metrics import psnr, bit_accuracy
@@ -65,9 +66,15 @@ def main():
     save_image(os.path.join(out_dir, "deep_residual_x10.png"),
                np.clip(128 + (wm.astype(float) - img) * 10, 0, 255))
 
-    print(f"\nPSNR(含水印, 原图) = {psnr(img, wm):.1f} dB")
-    print(f"{'attack':<22}{'bit_acc':>8}")
-    print("-" * 30)
+    # 经典基线:DWT-SVD 把同一组 bits 嵌到绿色通道,同图 / 同 payload / 同攻击 → 公平对比
+    classic = DWTSVDWatermark()
+    cimg = img.astype(np.float64).copy()
+    cimg[..., 1] = classic.embed(cimg[..., 1], bits)
+    wm_c = to_uint8(cimg)
+
+    print(f"\nPSNR(含水印 vs 原图): 深度={psnr(img, wm):.1f}dB  DWT-SVD基线={psnr(img, wm_c):.1f}dB")
+    print(f"{'attack':<22}{'deep':>8}{'DWT-SVD':>9}")
+    print("-" * 39)
     tests = [("none", lambda x: x),
              ("JPEG q50", lambda x: jpeg_recompress(x, 50)),
              ("JPEG q30", lambda x: jpeg_recompress(x, 30)),
@@ -75,11 +82,29 @@ def main():
              ("gaussian_noise 10", lambda x: gaussian_noise(x, 10)),
              ("regen_surrogate 0.3", lambda x: regeneration_surrogate(x, 0.3)),
              ("regen_surrogate 0.6", lambda x: regeneration_surrogate(x, 0.6))]
+    rows = {}
     for name, fn in tests:
-        acc = bit_accuracy(bits, model.extract(fn(wm)))
-        print(f"{name:<22}{acc:>8.3f}")
+        a_d = bit_accuracy(bits, model.extract(fn(wm)))
+        att_c = fn(wm_c)
+        a_c = bit_accuracy(bits, classic.extract(att_c[..., 1].astype(np.float64), len(bits)))
+        rows[name] = (a_d, a_c)
+        print(f"{name:<22}{a_d:>8.3f}{a_c:>9.3f}")
     print(f"\n图像已保存到: {out_dir}")
-    print("结论:深度水印靠'攻击层入环'训练,对再生成代理攻击的留存率明显高于经典基线。")
+
+    # —— 自动判定:对比结论由上表"深度 vs 经典 同攻击"实测算出,不写死预设结论 ——
+    RANDOM, MARGIN = 0.5, 0.10
+    regen_keys = [k for k in rows if k.startswith("regen")]
+    deep_regen = float(np.mean([rows[k][0] for k in regen_keys]))
+    cls_regen = float(np.mean([rows[k][1] for k in regen_keys]))
+    deep_survives = deep_regen > RANDOM + MARGIN
+    deep_beats = (deep_regen - cls_regen) >= MARGIN
+    print("\n== 自动判定(依据上表 深度 vs DWT-SVD 同攻击实测,非预设结论)==")
+    print(f"[1] 深度水印抗再生成代理: {'成立' if deep_survives else '不成立'} "
+          f"(regen 留存均值={deep_regen:.2f}[需>{RANDOM + MARGIN:.2f}=随机线+裕度])")
+    print(f"[2] 深度 > 经典基线(DWT-SVD): {'成立' if deep_beats else '不明显'} "
+          f"(深度regen={deep_regen:.2f} − 经典regen={cls_regen:.2f} = {deep_regen - cls_regen:+.2f}[需>={MARGIN}])")
+    if not deep_beats:
+        print("    注:tiny VAE 仅冒烟训练,差距可能不显著;论文级对比需 --vae sd 充分训练(见 scripts 05/07)。")
 
 
 if __name__ == "__main__":

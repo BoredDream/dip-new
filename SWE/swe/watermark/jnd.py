@@ -11,7 +11,7 @@ images"。本模块只取其**结构**为各 DCT 频带分配"可藏多少扰动
   * luminance_mask:亮度掩蔽。块越亮,人眼越不易察觉同等扰动 → 阈值随块亮度抬高。
 
 诚实声明:Watson 表原为"原图 8×8 DCT"标定;本项目嵌在 DWT-LL 子带的 DCT 上,
-故借用其**频率权重形状**,绝对尺度由 ImprovedDwtDct 的 jnd_scale 校准(见该类文档)。
+故借用其**频率权重形状**,绝对尺度由 P2 改进版方法(ImprovedDwtDct,待实现)的 jnd_scale 校准。
 
 每一步都可在含水印图上重算(常数表 + 块均值),不依赖被嵌系数本身,
 保证嵌入端/提取端推出的步长一致(QIM 自适应步长的必要条件)。
@@ -44,7 +44,7 @@ _WATSON_ZIGZAG = WATSON_LUMINANCE_TABLE.reshape(-1)[ZIGZAG_ORDER]
 def watson_band_weights(bands) -> np.ndarray:
     """返回所选 zigzag 频带的 Watson 频率敏感度阈值(相对量纲,均值归一)。
 
-    归一化使所选频带权重均值为 1:这样 ImprovedDwtDct 的基础步长 δ0 仍是主旋钮,
+    归一化使所选频带权重均值为 1:这样 P2 改进版的基础步长 δ0 仍是主旋钮,
     JND 只负责"在各频带间按可见性重新分配预算"(敏感频带少嵌、不敏感频带多嵌)。
     """
     bands = np.asarray(list(bands), dtype=np.int64)
