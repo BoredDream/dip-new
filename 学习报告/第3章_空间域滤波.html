@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第3章 空间域滤波 · 数字图像处理</title>
+<script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},svg:{fontCache:'global'}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+:root{--accent:#b21f1f;--accent2:#1a3a6b;--bg:#fafafa;--card:#fff;--concept:#1a73e8;--exam:#e8710a;--project:#0b8043;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;line-height:1.78;font-size:16px}
+.wrap{max-width:880px;margin:0 auto;padding:28px 24px 80px}
+.nav{font-size:14px;margin-bottom:18px}.nav a{color:var(--accent2);text-decoration:none;margin-right:14px}
+header.top{border-bottom:3px solid var(--accent);padding-bottom:16px;margin-bottom:24px}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:2px;font-size:13px}
+h1{font-size:27px;margin:6px 0 4px}.lede{color:#555;font-size:15px}
+h2{color:var(--accent2);border-left:5px solid var(--accent2);padding-left:12px;margin-top:38px;font-size:21px}
+h3{color:#333;margin-top:24px;font-size:17px}
+.box{border-radius:8px;padding:14px 18px;margin:18px 0;border:1px solid #e3e3e3;background:var(--card)}
+.box .t{font-weight:700;margin-bottom:6px;font-size:14px}
+.concept{border-left:4px solid var(--concept);background:#f3f8ff}.concept .t{color:var(--concept)}
+.exam{border-left:4px solid var(--exam);background:#fff7ef}.exam .t{color:var(--exam)}
+.project{border-left:4px solid var(--project);background:#f1faf3}.project .t{color:var(--project)}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:15px}
+th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;vertical-align:top}th{background:#f0f2f5}
+code{background:#eef0f2;padding:2px 6px;border-radius:4px;font-size:90%}
+ul,ol{padding-left:22px}
+.kernel{font-family:monospace;background:#f7f9fc;border:1px solid #e1e8f0;border-radius:6px;padding:10px 14px;display:inline-block;white-space:pre;line-height:1.5}
+footer{margin-top:48px;border-top:1px solid #ddd;padding-top:14px;color:#888;font-size:13px}
+@media print{body{background:#fff}.nav{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="nav"><a href="index.html">← 返回目录</a><a href="第2章_采样与量化.html">← 上一章</a><a href="第4章_频率域增强.html">下一章：频率域增强 →</a></div>
+<header class="top">
+  <div class="kicker">CHAPTER 3 · SPATIAL DOMAIN FILTERING</div>
+  <h1>第 3 章　空间域滤波</h1>
+  <div class="lede">「空间域」= 直接在像素矩阵上动手。从逐点灰度变换，到邻域卷积模板的平滑与锐化。</div>
+</header>
+
+<div class="box concept">
+  <div class="t">📌 本章学习目标</div>
+  <ul>
+    <li>掌握逐点灰度变换：反转、对数、伽马、对比度拉伸（公式 + 适用场景）</li>
+    <li>理解直方图与直方图均衡化的原理</li>
+    <li>掌握邻域卷积模板：平滑（均值/高斯/中值）与锐化（拉普拉斯/Sobel）</li>
+    <li>建立「空间滤波 = CNN 卷积祖先」的认知</li>
+  </ul>
+</div>
+
+<p>本章的统一框架是 <b>变换函数</b> $s=T(r)$：$r$ 是输入像素灰度，$s$ 是输出像素灰度。按 $T$ 作用的范围分两类：<b>逐点变换</b>（只看当前像素）与<b>邻域变换</b>（看周围一圈像素）。</p>
+
+<h2>3.1–3.2 灰度变换（逐点操作）</h2>
+<p>设灰度级 $L=2^k$，$k$ 为位深。常见变换：</p>
+
+<h3>① 图像反转 Negative</h3>
+<p>$$s = (L-1) - r$$</p>
+<p>把亮变暗、暗变亮。典型用途：医学影像（如乳腺钼靶）中，反转后<b>暗部细节更易被人眼察觉</b>。</p>
+
+<h3>② 对数变换 Log</h3>
+<p>$$s = c\,\log(1+r)$$</p>
+<p>把<b>大动态范围压缩</b>到可显示范围。典型用途：显示<b>傅里叶频谱</b>——频谱直流分量比其他成分大几个数量级，不取对数就只能看到中心一个亮点。</p>
+
+<h3>③ 幂律 / 伽马变换 Gamma</h3>
+<p>$$s = c\,r^{\gamma}\qquad(\gamma\ge0,\ 0\le r\le1)$$</p>
+<table>
+  <tr><th>$\gamma$ 取值</th><th>效果</th><th>场景</th></tr>
+  <tr><td>$\gamma<1$（如 0.3、0.4）</td><td>拉亮暗部、压缩亮部</td><td>偏暗图像（脊柱 X 光暗部细节）</td></tr>
+  <tr><td>$\gamma=1$</td><td>恒等（无变化）</td><td>—</td></tr>
+  <tr><td>$\gamma>1$（如 3、4、5）</td><td>压暗、增强亮部对比</td><td>偏亮图像（过曝航拍图）</td></tr>
+</table>
+<p>显示器的「伽马校正」就是它——CRT/LCD 输入输出非线性，需用伽马补偿。</p>
+
+<h3>④ 对比度拉伸 Contrast Stretching</h3>
+<p>用一条 S 形曲线 $T(r)$ 把灰度范围拉伸到充满 $[0,L-1]$：线性段贡献对比度拉伸，曲线越陡对比越强；极端情况退化为<b>阈值二值化</b>（黑白图）。</p>
+
+<div class="box exam">
+  <div class="t">⚠️ 常考：四种基本灰度变换曲线</div>
+  在「输出 $s$ — 输入 $r$」坐标系里记住形状：<b>恒等</b>（对角线）、<b>反转</b>（反对角线）、<b>对数/n 次根</b>（上凸，提暗部）、<b>反对数/n 次幂</b>（下凹，提亮部）。
+</div>
+
+<h2>3.3 算术与逻辑运算</h2>
+<ul>
+  <li><b>图像相加</b>：多帧平均 → 抑制随机噪声（噪声相消，信号叠加）；</li>
+  <li><b>图像相减</b>：运动检测、背景剔除、数字减影血管造影（DSA）；</li>
+  <li><b>逻辑与/或</b>：与掩膜（mask）做按位运算 → 提取 ROI 区域。</li>
+</ul>
+
+<h2>3.4 直方图处理</h2>
+<p><b>直方图</b> $h(r_k)$ = 灰度级 $r_k$ 出现的像素个数，反映图像明暗分布：偏左 = 整体偏暗，偏右 = 偏亮，集中 = 对比度低。</p>
+<div class="box concept">
+  <div class="t">直方图均衡化 Histogram Equalization</div>
+  用<b>累积分布函数（CDF）</b>作为变换函数：$s_k = T(r_k) = (L-1)\sum_{j=0}^{k} p(r_j)$，其中 $p(r_j)$ 是各灰度的概率（归一化直方图）。效果：把直方图「拉平」成近似均匀分布 → <b>自动增强全局对比度</b>，无需手调参数。
+</div>
+
+<h2>3.5 空间滤波（邻域操作 = 卷积模板）</h2>
+<p>用一个小窗口（模板/核，如 3×3）在图像上滑动，每个位置做加权求和，得到输出像素。这就是<b>卷积/相关</b>：</p>
+<p>$$g(x,y)=\sum_{s=-a}^{a}\sum_{t=-b}^{b} w(s,t)\,f(x+s,\,y+t)$$</p>
+
+<h3>① 平滑滤波（低通）—— 去噪、模糊</h3>
+<p>均值滤波核（3×3）：</p>
+<div class="kernel">1/9 × [ 1 1 1
+        1 1 1
+        1 1 1 ]</div>
+<p>高斯滤波：中心权重大、四周小，平滑同时保留更多结构。共同点：<b>抑制高频（噪声/细节），保留低频</b>，代价是图像变糊。</p>
+
+<h3>② 中值滤波（非线性）—— 专治椒盐噪声</h3>
+<p>取邻域内所有像素的<b>中位数</b>作为输出。不是加权平均，所以能<b>去掉孤立的亮/暗点（椒盐噪声）同时保住边缘</b>，这是均值滤波做不到的。</p>
+
+<h3>③ 锐化滤波（高通）—— 突出边缘</h3>
+<p>基于<b>微分</b>：边缘处灰度变化剧烈，导数大。</p>
+<ul>
+  <li><b>拉普拉斯</b>（二阶导，各向同性）核示例：</li>
+</ul>
+<div class="kernel">[ 0 -1  0
+ -1  4 -1
+  0 -1  0 ]</div>
+<ul>
+  <li><b>Sobel 梯度</b>（一阶导，分 x/y 方向）：检测水平/竖直边缘。</li>
+</ul>
+<p>锐化结果常叠加回原图：<b>原图 + 边缘 = 增强细节的图</b>。</p>
+
+<div class="box concept">
+  <div class="t">🔑 承上启下：空间滤波 → CNN 卷积</div>
+  CNN 里的「卷积层」就是这一节的直接后代。区别只在于：传统滤波的核是<b>人工设计</b>的（均值/Sobel/拉普拉斯），而 CNN 的核是<b>从数据中学习</b>出来的。理解了空间卷积模板，第 6 章的卷积就毫无神秘感。
+</div>
+
+<div class="box project">
+  <div class="t">🎯 与水印项目的关联</div>
+  <ul>
+    <li><b>滤波 = 攻击工具也 = 分析工具。</b>「AI 修图」的代理攻击常用<b>模糊（低通）</b>来近似（这正是 VINE 参考实现的思路：用模糊当扩散重绘的代理）。低通会抹掉高频，所以把水印藏在高频里很危险。</li>
+    <li>JPEG 压缩 ≈ 丢高频；中值/均值滤波 ≈ 平滑攻击。你的鲁棒性测试本质上就是「水印能不能扛过这些空间/频率域的退化」。</li>
+  </ul>
+</div>
+
+<div class="box concept">
+  <div class="t">🧠 一句话小结</div>
+  空间域 = 直接改像素。逐点变换（反转/对数/伽马/拉伸）调整明暗对比；直方图均衡自动增强对比；邻域卷积核做平滑（低通去噪）或锐化（高通提边）。卷积核是 CNN 的前身。
+</div>
+
+<footer>第 3 章 空间域滤波 · 数字图像处理课程学习报告 · 公式由 MathJax 渲染</footer>
+</div>
+</body>
+</html>

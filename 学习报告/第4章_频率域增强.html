@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第4章 频率域增强 · 数字图像处理</title>
+<script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},svg:{fontCache:'global'}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+:root{--accent:#b21f1f;--accent2:#1a3a6b;--bg:#fafafa;--card:#fff;--concept:#1a73e8;--exam:#e8710a;--project:#0b8043;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;line-height:1.78;font-size:16px}
+.wrap{max-width:880px;margin:0 auto;padding:28px 24px 80px}
+.nav{font-size:14px;margin-bottom:18px}.nav a{color:var(--accent2);text-decoration:none;margin-right:14px}
+header.top{border-bottom:3px solid var(--accent);padding-bottom:16px;margin-bottom:24px}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:2px;font-size:13px}
+h1{font-size:27px;margin:6px 0 4px}.lede{color:#555;font-size:15px}
+h2{color:var(--accent2);border-left:5px solid var(--accent2);padding-left:12px;margin-top:38px;font-size:21px}
+h3{color:#333;margin-top:24px;font-size:17px}
+.box{border-radius:8px;padding:14px 18px;margin:18px 0;border:1px solid #e3e3e3;background:var(--card)}
+.box .t{font-weight:700;margin-bottom:6px;font-size:14px}
+.concept{border-left:4px solid var(--concept);background:#f3f8ff}.concept .t{color:var(--concept)}
+.exam{border-left:4px solid var(--exam);background:#fff7ef}.exam .t{color:var(--exam)}
+.project{border-left:4px solid var(--project);background:#f1faf3}.project .t{color:var(--project)}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:15px}
+th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;vertical-align:top}th{background:#f0f2f5}
+code{background:#eef0f2;padding:2px 6px;border-radius:4px;font-size:90%}
+ul,ol{padding-left:22px}
+footer{margin-top:48px;border-top:1px solid #ddd;padding-top:14px;color:#888;font-size:13px}
+@media print{body{background:#fff}.nav{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="nav"><a href="index.html">← 返回目录</a><a href="第3章_空间域滤波.html">← 上一章</a><a href="第5章_特征提取.html">下一章：特征提取 →</a></div>
+<header class="top">
+  <div class="kicker">CHAPTER 4 · FREQUENCY DOMAIN ENHANCEMENT</div>
+  <h1>第 4 章　频率域增强</h1>
+  <div class="lede">换个角度看图像：把图像分解成不同频率的正弦波之和，在频域里增强、去噪、滤波。本章是<b>传统水印的理论核心</b>。</div>
+</header>
+
+<div class="box concept">
+  <div class="t">📌 本章学习目标</div>
+  <ul>
+    <li>理解核心思想：任何波形 = 正弦/余弦波的加权和；时空域 ↔ 频域可逆</li>
+    <li>掌握傅里叶变换在图像中的含义（低频/高频/直流分量）</li>
+    <li>了解 DCT、Walsh 变换的用途（JPEG 压缩）</li>
+    <li>掌握频域低通/高通滤波；了解小波多分辨率分析</li>
+  </ul>
+</div>
+
+<div class="box concept">
+  <div class="t">🔑 一句话抓住本章</div>
+  <b>任何复杂波形，都能分解成一组不同频率、不同幅度的正弦波之和。</b>「频域」就是换一组「正弦波基」来描述同一个图像——描述方式变了，信息没丢（可逆）。
+</div>
+
+<h2>4.1 频域与频域变换</h2>
+<p>同一信号有两种等价表示：</p>
+<ul>
+  <li><b>时域/空域函数</b>：横轴是时间/位置，看「什么时刻/位置幅值多少」；</li>
+  <li><b>频域函数</b>：横轴是频率，看「含有哪些频率成分、各占多少」。</li>
+</ul>
+<p>例子：一个纯 5 Hz 正弦，频谱上就是 <b>5 Hz 处一根谱线</b>；5 Hz + 20 Hz 叠加，频谱上就是 <b>两根谱线</b>。频率越高，波形振荡越密。这个「时域波 ↔ 频域几根线」的对应是<b>可逆</b>的。</p>
+
+<h2>4.2 傅里叶变换</h2>
+<p>一维离散傅里叶变换（DFT）：</p>
+<p>$$F(u)=\sum_{x=0}^{N-1} f(x)\,e^{-j2\pi u x/N},\qquad f(x)=\frac{1}{N}\sum_{u=0}^{N-1} F(u)\,e^{\,j2\pi u x/N}$$</p>
+<p>二维（图像）DFT：</p>
+<p>$$F(u,v)=\sum_{x=0}^{M-1}\sum_{y=0}^{N-1} f(x,y)\,e^{-j2\pi\left(\frac{ux}{M}+\frac{vy}{N}\right)}$$</p>
+
+<div class="box exam">
+  <div class="t">⚠️ 图像频谱怎么读（高频考点）</div>
+  <table>
+    <tr><th>频率成分</th><th>对应图像内容</th></tr>
+    <tr><td><b>直流分量</b>（频谱中心最亮点 $F(0,0)$）</td><td>图像的平均亮度</td></tr>
+    <tr><td><b>低频</b>（靠近中心）</td><td>缓慢变化的大块平坦区域、整体轮廓</td></tr>
+    <tr><td><b>高频</b>（远离中心）</td><td>边缘、细节、纹理、噪声</td></tr>
+  </table>
+  频谱通常做<b>对数变换 $\log(1+|F|)$ 后显示</b>，否则只能看到中心一个亮点（见第 3 章对数变换）。
+</div>
+
+<h2>4.3–4.5 其他正交变换</h2>
+<table>
+  <tr><th>变换</th><th>特点</th><th>用途</th></tr>
+  <tr><td><b>DCT</b> 离散余弦变换</td><td>只用余弦基、输出实数、能量高度集中在低频</td><td><b>JPEG 压缩核心</b>（8×8 分块 DCT）</td></tr>
+  <tr><td><b>Walsh / Hadamard</b></td><td>基函数是 ±1 方波，只需加减、无乘法</td><td>计算快、硬件友好的变换编码</td></tr>
+</table>
+
+<h2>4.6 频域图像增强（滤波）</h2>
+<div class="box concept">
+  <div class="t">频域滤波三步法</div>
+  <ol>
+    <li>图像做傅里叶变换 → $F(u,v)$；</li>
+    <li>乘上一个滤波器 $H(u,v)$ → $G(u,v)=H(u,v)F(u,v)$；</li>
+    <li>逆傅里叶变换 → 得到处理后的图像。</li>
+  </ol>
+</div>
+<table>
+  <tr><th>滤波器</th><th>保留</th><th>效果</th></tr>
+  <tr><td><b>低通 LPF</b>（理想 / 巴特沃斯 / 高斯）</td><td>低频</td><td>去高频 → 平滑、去噪（同时变糊）</td></tr>
+  <tr><td><b>高通 HPF</b></td><td>高频</td><td>去低频 → 锐化、突出边缘</td></tr>
+</table>
+<p>注意：理想滤波器（硬截断）会产生<b>振铃效应</b>，所以实际常用巴特沃斯/高斯这类平滑过渡的滤波器。空间域卷积 ↔ 频域相乘，二者等价（卷积定理）。</p>
+
+<h2>4.7 小波变换</h2>
+<div class="box concept">
+  <div class="t">为什么需要小波</div>
+  傅里叶变换的弱点：<b>只告诉你「有哪些频率」，不告诉你「频率出现在哪里」</b>（全局性，丢失位置信息）。<b>小波变换</b>同时给出<b>频率 + 位置</b>的局部信息，并支持<b>多分辨率分析</b>（把图像分解成不同尺度的近似与细节子带，如 LL/LH/HL/HH）。这也是 JPEG2000 的基础。
+</div>
+
+<div class="box project">
+  <div class="t">🎯 与水印项目的关联（本章是你的主战场）</div>
+  <ul>
+    <li>你 <code>en-water/traditional_watermark.py</code> 里的 <b>DCT、Haar 小波、DFT</b> 方法，本质都是<b>把水印比特嵌进变换域系数</b>，而不是直接改像素。</li>
+    <li>为什么嵌<b>中频系数</b>最稳：<b>低频</b>系数一改，画面整体变化大、肉眼可见（破坏 PSNR）；<b>高频</b>系数一改，容易被 JPEG 压缩 / 模糊攻击直接丢掉（破坏鲁棒性）。<b>中频</b>是「不可见性」与「鲁棒性」的折中。</li>
+    <li>调鲁棒性主要靠 QIM 的量化步长 $\delta$：$\delta$ 越大越抗攻击，但 PSNR 越低——这正是频域能量分布知识的直接应用。</li>
+    <li>小波的多分辨率特性 → 可以把水印嵌在中间尺度子带，兼顾鲁棒与隐蔽。</li>
+  </ul>
+</div>
+
+<div class="box concept">
+  <div class="t">🧠 一句话小结</div>
+  傅里叶把图像分解成正弦波：低频=大块平坦、高频=边缘噪声、中心=平均亮度。频域滤波 = 变换→乘滤波器→逆变换（低通去噪、高通锐化）。DCT 用于 JPEG，小波同时给频率+位置。变换域是水印鲁棒性的根基。
+</div>
+
+<footer>第 4 章 频率域增强 · 数字图像处理课程学习报告 · 公式由 MathJax 渲染</footer>
+</div>
+</body>
+</html>

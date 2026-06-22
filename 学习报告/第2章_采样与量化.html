@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第2章 采样与量化 · 数字图像处理</title>
+<script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},svg:{fontCache:'global'}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+:root{--accent:#b21f1f;--accent2:#1a3a6b;--bg:#fafafa;--card:#fff;--concept:#1a73e8;--exam:#e8710a;--project:#0b8043;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;line-height:1.78;font-size:16px}
+.wrap{max-width:880px;margin:0 auto;padding:28px 24px 80px}
+.nav{font-size:14px;margin-bottom:18px}.nav a{color:var(--accent2);text-decoration:none;margin-right:14px}
+header.top{border-bottom:3px solid var(--accent);padding-bottom:16px;margin-bottom:24px}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:2px;font-size:13px}
+h1{font-size:27px;margin:6px 0 4px}.lede{color:#555;font-size:15px}
+h2{color:var(--accent2);border-left:5px solid var(--accent2);padding-left:12px;margin-top:38px;font-size:21px}
+h3{color:#333;margin-top:24px;font-size:17px}
+.box{border-radius:8px;padding:14px 18px;margin:18px 0;border:1px solid #e3e3e3;background:var(--card)}
+.box .t{font-weight:700;margin-bottom:6px;font-size:14px}
+.concept{border-left:4px solid var(--concept);background:#f3f8ff}.concept .t{color:var(--concept)}
+.exam{border-left:4px solid var(--exam);background:#fff7ef}.exam .t{color:var(--exam)}
+.project{border-left:4px solid var(--project);background:#f1faf3}.project .t{color:var(--project)}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:15px}
+th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;vertical-align:top}th{background:#f0f2f5}
+code{background:#eef0f2;padding:2px 6px;border-radius:4px;font-size:90%}
+ul,ol{padding-left:22px}
+footer{margin-top:48px;border-top:1px solid #ddd;padding-top:14px;color:#888;font-size:13px}
+@media print{body{background:#fff}.nav{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="nav"><a href="index.html">← 返回目录</a><a href="第1章_导论.html">← 上一章</a><a href="第3章_空间域滤波.html">下一章：空间域滤波 →</a></div>
+<header class="top">
+  <div class="kicker">CHAPTER 2 · SAMPLING &amp; QUANTIZATION</div>
+  <h1>第 2 章　采样与量化</h1>
+  <div class="lede">回答一个核心问题：连续的真实世界，如何变成离散的数字矩阵？再讲图像的几何变换。</div>
+</header>
+
+<div class="box concept">
+  <div class="t">📌 本章学习目标</div>
+  <ul>
+    <li>理解成像模型（人眼 ≈ 相机）与四个坐标系</li>
+    <li>分清<b>采样</b>（管分辨率）与<b>量化</b>（管灰度级）</li>
+    <li>掌握存储量公式与「采样数/灰度级 ↔ 图像质量」的权衡（重点）</li>
+    <li>用 3×3 齐次矩阵统一表达平移/缩放/旋转/仿射，理解插值</li>
+  </ul>
+</div>
+
+<h2>2.1 成像模型</h2>
+<h3>人眼 ≈ 相机</h3>
+<table>
+  <tr><th>人眼</th><th>相机</th><th>作用</th></tr>
+  <tr><td>角膜+晶状体</td><td>镜头 lens</td><td>聚焦光线</td></tr>
+  <tr><td>瞳孔/虹膜</td><td>光圈 aperture</td><td>控制进光量</td></tr>
+  <tr><td>视网膜 retina</td><td>传感器 sensor</td><td>捕获图像</td></tr>
+  <tr><td>视神经</td><td>数据线</td><td>传输图像</td></tr>
+</table>
+<p>视网膜上有两类感光细胞：<b>视锥细胞</b>（集中在中央凹，负责彩色与细节，对应明视觉）和<b>视杆细胞</b>（外周多，负责暗视觉与亮度）。这解释了人眼对亮度/细节的感知规律，也是后续「为什么图像增强对人有效」的生理基础。</p>
+
+<div class="box concept">
+  <div class="t">视觉错觉 = 人眼不是「老实」的传感器</div>
+  马赫带（边界处亮度被夸大）、同时对比（同一灰块在不同背景下显得不同）、各种几何错觉——说明 <b>人感知的亮度 ≠ 物理亮度</b>。图像处理的目标常常是「让人看着更好」，而非「物理上更准」。
+</div>
+
+<h3>成像传感器的三种方式</h3>
+<ul>
+  <li><b>单个传感器</b>：配合机械移动逐点扫描成像；</li>
+  <li><b>线传感器（传感器带/环）</b>：一次出一行，配合线性移动；典型是 <b>CT</b>（X 射线绕物体旋转 + 平移 → 图像重建出断层）；</li>
+  <li><b>面阵传感器</b>：一次成整幅图，即相机的 CCD/CMOS。</li>
+</ul>
+
+<h3>透视投影与坐标系</h3>
+<p>3D 世界点投影到 2D 图像，要经过四个坐标系的串联变换：</p>
+<p style="text-align:center"><b>世界坐标系 → 相机坐标系 → 图像平面坐标系 → 数字图像坐标系</b></p>
+<p>图像捕获两类信息：<b>几何信息</b>（位置、点、线、曲线）与 <b>光度信息</b>（强度、颜色）。相机模型是对真实 3D→2D 关系的近似。</p>
+
+<h2>2.2 采样与量化（本章核心）</h2>
+<div class="box concept">
+  <div class="t">两个独立的离散化过程</div>
+  <ul>
+    <li><b>采样 Sampling</b>：对<b>空间坐标 (x,y)</b> 离散化 → 决定<b>分辨率</b>（图像有 $M\times N$ 个像素）。采样越密，像素越多。</li>
+    <li><b>量化 Quantization</b>：对<b>幅度（灰度值）</b> 离散化 → 决定<b>灰度级</b>。每像素用 $k$ 位表示，共 $L=2^k$ 个灰度级（8 位 = 256 级）。</li>
+  </ul>
+  一句话：采样管「横竖分多少格」，量化管「每格的颜色分多少档」。
+</div>
+
+<h3>存储量公式</h3>
+<p>$$b = M\times N\times k \quad\text{（方形图 }M=N\text{ 时 } b=N^2 k\text{）}$$</p>
+<p>其中 $k$ = 每像素比特数，$L=2^k$ = 灰度级数。这条公式说明分辨率和位深都直接决定存储/带宽——这也是后面「图像编码压缩」的动机。</p>
+
+<div class="box exam">
+  <div class="t">⚠️ 质量权衡（本章最常考）</div>
+  <table>
+    <tr><th>固定项</th><th>减少另一项</th><th>退化现象</th></tr>
+    <tr><td>固定灰度级 $k$</td><td>减少采样点 $N$</td><td><b>方块效应</b> blocking（图像变马赛克）</td></tr>
+    <tr><td>固定采样 $N$</td><td>减少灰度级 $k$</td><td><b>假轮廓</b> false contour（平坦区出现条带，极端为二值图）</td></tr>
+  </table>
+  <b>实用结论：</b>当图像尺寸/容量受限时——
+  <ul>
+    <li>图像<b>直方图平坦、细节少</b>（如人脸）→ <b>粗采样 + 细量化</b>，避免假轮廓；</li>
+    <li>图像<b>细节丰富</b>（如看台人群）→ <b>细采样 + 粗量化</b>，避免模糊。</li>
+  </ul>
+  口诀：<b>缺细节就多给采样，缺层次就多给灰度。</b>
+</div>
+
+<h2>2.3 图像几何变换</h2>
+<p>用 <b>3×3 齐次坐标矩阵</b> 统一表达所有线性几何变换。点写成 $v=[x,\ y,\ 1]^{T}$，变换为 $v' = Av$。</p>
+
+<h3>平移 Translation</h3>
+<p>$$T=\begin{bmatrix}1&0&t_x\\0&1&t_y\\0&0&1\end{bmatrix},\qquad T^{-1}=\begin{bmatrix}1&0&-t_x\\0&1&-t_y\\0&0&1\end{bmatrix}$$</p>
+
+<h3>缩放 Scaling</h3>
+<p>$$S=\begin{bmatrix}s_x&0&0\\0&s_y&0\\0&0&1\end{bmatrix},\qquad S^{-1}=\begin{bmatrix}1/s_x&0&0\\0&1/s_y&0\\0&0&1\end{bmatrix}$$</p>
+
+<h3>旋转 Rotation（绕原点，角度 $\theta$）</h3>
+<p>$$R=\begin{bmatrix}\cos\theta&\sin\theta&0\\-\sin\theta&\cos\theta&0\\0&0&1\end{bmatrix},\qquad R^{-1}=\begin{bmatrix}\cos\theta&-\sin\theta&0\\\sin\theta&\cos\theta&0\\0&0&1\end{bmatrix}$$</p>
+
+<h3>仿射 Affine</h3>
+<p>$$A=\begin{bmatrix}a_{11}&a_{12}&t_x\\a_{21}&a_{22}&t_y\\0&0&1\end{bmatrix}$$</p>
+<p>仿射 = 平移 + 缩放 + 旋转 + 错切的组合，保持「直线仍是直线、平行线仍平行」。</p>
+
+<div class="box concept">
+  <div class="t">插值（变换后的必经步骤）</div>
+  缩放/旋转后，目标像素映射回原图常落在<b>非整数位置</b>，需要插值估计灰度：
+  <ul>
+    <li><b>最近邻插值</b>：取最近像素，快但有锯齿/块状；</li>
+    <li><b>双线性插值</b>：用周围 4 个像素加权平均，平滑但略糊。</li>
+  </ul>
+</div>
+
+<div class="box project">
+  <div class="t">🎯 与水印项目的关联</div>
+  本章是<b>几何攻击</b>的理论来源。缩放、旋转、裁剪是水印鲁棒性测试的标准项；而插值带来的<b>取整误差</b>正是 LSB（最低有效位）类方法极易被破坏的原因——只要图像被重采样一次，最低位几乎全乱。这解释了为什么你的 <code>traditional_watermark.py</code> 里变换域方法（DCT/小波/SVD）比 LSB 抗几何攻击更强。
+</div>
+
+<div class="box concept">
+  <div class="t">🧠 一句话小结</div>
+  采样定分辨率、量化定灰度级，存储量 $b=MNk$；细节少→细量化、细节多→细采样；几何变换统一为 $v'=Av$，变换后需插值。
+</div>
+
+<footer>第 2 章 采样与量化 · 数字图像处理课程学习报告 · 公式由 MathJax 渲染</footer>
+</div>
+</body>
+</html>

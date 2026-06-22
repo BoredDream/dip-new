@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数字图像处理 · 课程学习报告</title>
+<style>
+:root{--accent:#b21f1f;--accent2:#1a3a6b;--bg:#fafafa;--card:#fff;--concept:#1a73e8;--exam:#e8710a;--project:#0b8043;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;line-height:1.75;font-size:16px}
+.wrap{max-width:920px;margin:0 auto;padding:36px 24px 80px}
+header.top{border-bottom:3px solid var(--accent);padding-bottom:18px;margin-bottom:28px}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:2px;font-size:13px}
+h1{font-size:30px;margin:8px 0 6px}
+.lede{color:#555;font-size:15px}
+h2{color:var(--accent2);border-left:5px solid var(--accent2);padding-left:12px;margin-top:42px;font-size:21px}
+.pipeline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:18px 0;font-size:14px}
+.pipeline .step{background:#eef2f8;border:1px solid #d3ddea;border-radius:20px;padding:6px 14px;color:#1a3a6b;font-weight:600}
+.pipeline .arrow{color:#999;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:18px}
+.card{display:block;text-decoration:none;color:inherit;background:var(--card);border:1px solid #e3e3e3;border-radius:10px;padding:18px 20px;transition:.15s;border-top:4px solid var(--accent2)}
+.card:hover{box-shadow:0 6px 20px rgba(0,0,0,.08);transform:translateY(-2px)}
+.card .num{color:var(--accent);font-weight:700;font-size:13px;letter-spacing:1px}
+.card .title{font-size:18px;font-weight:700;margin:4px 0 8px}
+.card .desc{color:#666;font-size:13.5px;line-height:1.6}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:15px}
+th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}
+th{background:#f0f2f5}
+.box{border-radius:8px;padding:14px 18px;margin:18px 0;border:1px solid #e3e3e3;background:var(--card);border-left:4px solid var(--project)}
+.box .t{font-weight:700;margin-bottom:6px;font-size:14px;color:var(--project)}
+footer{margin-top:52px;border-top:1px solid #ddd;padding-top:14px;color:#888;font-size:13px}
+@media print{body{background:#fff}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="kicker">DIGITAL IMAGE PROCESSING · 华中农业大学 · 2026 春</div>
+  <h1>数字图像处理 · 课程学习报告</h1>
+  <div class="lede">基于课程课件（冈萨雷斯体系 + 深度学习视觉）整理 · 每章自包含 HTML，公式由 MathJax 渲染</div>
+</header>
+
+<h2>课程主线：一条图像处理流水线</h2>
+<div class="pipeline">
+  <span class="step">图像获取</span><span class="arrow">→</span>
+  <span class="step">图像预处理</span><span class="arrow">→</span>
+  <span class="step">ROI / 特征提取</span><span class="arrow">→</span>
+  <span class="step">视觉任务</span><span class="arrow">→</span>
+  <span class="step">图像编码</span>
+</div>
+<p>整门课就是沿这条流水线，从「像素级低层处理」一路走到「语义级计算机视觉」。三个层次：<b>图像处理</b>（图→图）、<b>图像分析</b>（图→特征/目标）、<b>计算机视觉</b>（图→语义）。越往后数据量越小、抽象程度越高。</p>
+
+<h2>各章报告</h2>
+<div class="grid">
+  <a class="card" href="第1章_导论.html"><div class="num">CHAPTER 1</div><div class="title">导论</div><div class="desc">什么是 DIP、图像矩阵、三个层次、按波段分类、发展简史。建立全局认知。</div></a>
+  <a class="card" href="第2章_采样与量化.html"><div class="num">CHAPTER 2</div><div class="title">采样与量化</div><div class="desc">成像模型、采样 vs 量化、分辨率与灰度级权衡、几何变换齐次矩阵、插值。</div></a>
+  <a class="card" href="第3章_空间域滤波.html"><div class="num">CHAPTER 3</div><div class="title">空间域滤波</div><div class="desc">灰度变换（反转/对数/伽马）、对比度拉伸、直方图均衡、卷积模板平滑与锐化。</div></a>
+  <a class="card" href="第4章_频率域增强.html"><div class="num">CHAPTER 4</div><div class="title">频率域增强</div><div class="desc">傅里叶变换、DCT/Walsh、低通高通滤波、小波多分辨率。水印项目核心武器。</div></a>
+  <a class="card" href="第5章_特征提取.html"><div class="num">CHAPTER 5</div><div class="title">特征提取</div><div class="desc">特征选取三原则、颜色直方图、颜色矩、HSV 分块、相似度度量、局部描述子。</div></a>
+  <a class="card" href="第6章_神经网络与CNN.html"><div class="num">CHAPTER 6</div><div class="title">神经网络与 CNN</div><div class="desc">AI/ML/DL 关系、神经元、CNN 局部连接与权值共享、四大视觉任务、训练流程。</div></a>
+</div>
+
+<div class="box">
+  <div class="t">🎯 与课程 Project（水印留存）的关联</div>
+  你的课题是「设计一种水印方法，使图片经 AI 修图后仍保持高留存率」。课程知识的落点：<b>第 4 章频域</b>是传统水印（DCT/小波/DFT 嵌系数）的理论基础；<b>第 2、3 章</b>提供攻击模型（几何变换、JPEG、噪声）；<b>第 6 章 CNN/深度学习</b>帮助理解 AI 修图（扩散重绘）为何会抹掉水印，以及如何用联合训练对抗。每章报告末尾都有「与水印项目」专栏。
+</div>
+
+<footer>
+  说明：公式渲染依赖 MathJax CDN（需联网）。如需离线，可把 MathJax 脚本下载到本地后替换各文件中的 &lt;script src&gt; 路径。导出 PDF：浏览器打开 → 打印 → 另存为 PDF。
+</footer>
+</div>
+</body>
+</html>

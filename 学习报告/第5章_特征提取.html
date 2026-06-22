@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第5章 特征提取 · 数字图像处理</title>
+<script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},svg:{fontCache:'global'}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+:root{--accent:#b21f1f;--accent2:#1a3a6b;--bg:#fafafa;--card:#fff;--concept:#1a73e8;--exam:#e8710a;--project:#0b8043;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;line-height:1.78;font-size:16px}
+.wrap{max-width:880px;margin:0 auto;padding:28px 24px 80px}
+.nav{font-size:14px;margin-bottom:18px}.nav a{color:var(--accent2);text-decoration:none;margin-right:14px}
+header.top{border-bottom:3px solid var(--accent);padding-bottom:16px;margin-bottom:24px}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:2px;font-size:13px}
+h1{font-size:27px;margin:6px 0 4px}.lede{color:#555;font-size:15px}
+h2{color:var(--accent2);border-left:5px solid var(--accent2);padding-left:12px;margin-top:38px;font-size:21px}
+h3{color:#333;margin-top:24px;font-size:17px}
+.box{border-radius:8px;padding:14px 18px;margin:18px 0;border:1px solid #e3e3e3;background:var(--card)}
+.box .t{font-weight:700;margin-bottom:6px;font-size:14px}
+.concept{border-left:4px solid var(--concept);background:#f3f8ff}.concept .t{color:var(--concept)}
+.exam{border-left:4px solid var(--exam);background:#fff7ef}.exam .t{color:var(--exam)}
+.project{border-left:4px solid var(--project);background:#f1faf3}.project .t{color:var(--project)}
+table{border-collapse:collapse;width:100%;margin:18px 0;font-size:15px}
+th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;vertical-align:top}th{background:#f0f2f5}
+code{background:#eef0f2;padding:2px 6px;border-radius:4px;font-size:90%}
+ul,ol{padding-left:22px}
+footer{margin-top:48px;border-top:1px solid #ddd;padding-top:14px;color:#888;font-size:13px}
+@media print{body{background:#fff}.nav{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="nav"><a href="index.html">← 返回目录</a><a href="第4章_频率域增强.html">← 上一章</a><a href="第6章_神经网络与CNN.html">下一章：神经网络与 CNN →</a></div>
+<header class="top">
+  <div class="kicker">CHAPTER 5 · FEATURE EXTRACTION</div>
+  <h1>第 5 章　特征提取</h1>
+  <div class="lede">从「一堆像素」提炼出能代表图像内容的「特征向量」——这是从图像处理迈向图像分析/检索的桥梁。</div>
+</header>
+
+<div class="box concept">
+  <div class="t">📌 本章学习目标</div>
+  <ul>
+    <li>理解什么是特征、为什么要提特征、选特征的三原则</li>
+    <li>掌握颜色特征：颜色直方图、颜色矩、HSV 分块表示</li>
+    <li>掌握两幅图的相似度度量（欧氏距离、直方图交）</li>
+    <li>了解局部特征检测子与描述子的概念</li>
+  </ul>
+</div>
+
+<h2>5.1 什么是特征 & 选取原则</h2>
+<p><b>特征</b> = 从图像中提取的、能紧凑表达其内容的量（颜色、纹理、形状、关键点…）。一幅 $512\times512$ 的图有几十万像素，直接比较像素既慢又对噪声敏感，所以要先压成低维「特征向量」。</p>
+<div class="box exam">
+  <div class="t">⚠️ 常考：选特征的三原则</div>
+  <ol>
+    <li><b>信息充分</b>：特征要携带足够多关于图像的信息；</li>
+    <li><b>易于计算</b>：便于大规模图像库和快速检索；</li>
+    <li><b>贴合感知</b>：要与人的视觉感知特性相符。</li>
+  </ol>
+  注意：由于<b>感知的主观性</b>，不存在「唯一最好」的特征表示——要按任务选特征。
+</div>
+
+<h2>5.2 颜色特征（最常用）</h2>
+<h3>颜色直方图 Color Histogram</h3>
+<p>统计图像中每种颜色（或灰度）出现的频率，得到一个分布向量。</p>
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr><td>对平移、旋转、尺度变化<b>不变</b>；计算简单</td><td><b>完全丢失空间信息</b>（两张内容不同但颜色分布相同的图无法区分）</td></tr>
+</table>
+
+<h3>颜色矩 Color Moments（紧凑表示）</h3>
+<p>不存整个直方图，只用前几阶矩来概括分布：</p>
+<p>$$E_i=\frac{1}{N}\sum_{j=1}^{N}P_{ij}\quad(\text{均值})\qquad \sigma_i=\sqrt{\frac{1}{N}\sum_{j=1}^{N}(P_{ij}-E_i)^2}\quad(\text{标准差})$$</p>
+<p>$$s_i=\sqrt[3]{\frac{1}{N}\sum_{j=1}^{N}(P_{ij}-E_i)^3}\quad(\text{偏度})$$</p>
+<p>三阶矩（均值/标准差/偏度）就能较好地概括一个颜色通道的分布，维度极低。</p>
+
+<h3>HSV 分块表示（找回空间信息）</h3>
+<div class="box concept">
+  <div class="t">改进思路</div>
+  <ul>
+    <li>用 <b>HSV 颜色模型</b>（色调 H / 饱和度 S / 明度 V），更贴近人眼感知；</li>
+    <li>把图像划分成 $M\times N$ 个<b>重叠的块</b>，每块单独算 H、S、V 三个局部直方图；</li>
+    <li>这样既保留颜色分布，又部分保留了「颜色出现在哪」的空间布局。</li>
+  </ul>
+</div>
+
+<h2>5.3 相似度度量</h2>
+<p>检索/匹配时，比较查询图 $Q$ 与库图 $D$ 的特征：</p>
+<p>$$M_E(Q,D)=\sqrt{\sum_{k=0}^{L-1}\big[H_Q(k)-H_D(k)\big]^2}\quad(\text{欧氏距离，越小越相似})$$</p>
+<p>$$P(Q,D)=\frac{\sum_{k=0}^{L-1}\min\big[H_Q(k),H_D(k)\big]}{\sum_{k=0}^{L-1}H_Q(k)}\quad(\text{直方图交,越大越相似})$$</p>
+
+<h2>5.4 局部特征检测子与描述子</h2>
+<p>除了全局颜色，还可提取<b>局部特征</b>：</p>
+<ul>
+  <li><b>检测子 Detector</b>：找出图像中显著、可重复的关键点（角点、斑点）；</li>
+  <li><b>描述子 Descriptor</b>：在关键点周围构造一段向量来刻画其局部外观（如 SIFT/SURF 类，对旋转/尺度具有一定不变性）；</li>
+  <li>纹理特征、形状特征也属于这一类。</li>
+</ul>
+
+<div class="box project">
+  <div class="t">🎯 与水印项目的关联</div>
+  特征提取的思想反映在水印的<b>解码端</b>：解码本质是「从可能被攻击过的图像里，提取出隐藏在某些系数/特征中的比特」。而<b>留存率（比特准确率）</b>就是一种特征匹配度量，和这里的相似度度量同源。此外，「鲁棒特征」（对旋转/缩放/压缩不变的量）正是抗攻击水印想要嵌入的载体——选特征三原则同样适用于「选哪个系数嵌水印」。
+</div>
+
+<div class="box concept">
+  <div class="t">🧠 一句话小结</div>
+  特征 = 图像的紧凑表示；选特征要信息足、好算、贴合感知。颜色直方图最常用但丢空间信息，用颜色矩压缩、用 HSV 分块找回空间。相似度用欧氏距离/直方图交度量。局部特征 = 检测子 + 描述子。
+</div>
+
+<footer>第 5 章 特征提取 · 数字图像处理课程学习报告 · 公式由 MathJax 渲染</footer>
+</div>
+</body>
+</html>
