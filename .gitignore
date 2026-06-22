@@ -1,0 +1,36 @@
+# ============================================================
+# 顶层 .gitignore —— 防止数据集 / 大文件 / 生成物被提交进 git
+# (SWE/ 包内另有一份 SWE/.gitignore,二者互补)
+# ============================================================
+
+# ---- Python 缓存 ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- 数据集:体积大,本地保留、不入库 ----
+*.zip
+SWE/data/div2k/
+**/DIV2K_train_HR/
+
+# ---- 参考仓库:VINE-main 约 74MB,仅本地备查不入库;
+#      references/guetzli 较小(<1MB),保留入库以便答辩展示来源 ----
+references/VINE-main/
+
+# ---- 深度模型训练产物 ----
+checkpoints/
+*.pth
+*.ckpt
+*.safetensors
+
+# ---- 实验生成的图/表:可由 scripts 复现,不入库 ----
+SWE/results/figures/
+SWE/results/**/*.csv
+SWE/results/**/*.json
+!SWE/results/.gitkeep
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+.agents/

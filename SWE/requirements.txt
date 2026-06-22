@@ -1,0 +1,8 @@
+# SWE 核心依赖(经典水印 + JPEG 编解码 + 攻击套件 + 评估,纯 CPU 可跑)
+# 不依赖 opencv/pywt:DCT、Haar 小波、SVD、DFT 与所有滤波/几何攻击均由
+# numpy / scipy / scikit-image / Pillow 实现。
+numpy>=1.23
+Pillow>=9.0
+scipy>=1.9
+scikit-image>=0.19
+matplotlib>=3.5

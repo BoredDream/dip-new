@@ -1,0 +1,33 @@
+# SWE 深度水印 + 真 AI 攻击依赖(在 requirements.txt 之上按需追加)。
+# 各项依赖按"功能 -> 所需库"分层,只装你要用的功能即可:
+#
+#   功能                                          需要的库
+#   ------------------------------------------    ----------------------------------
+#   深度水印最小可用(--vae tiny --decoder cnn)   torch                      ← 唯一硬依赖
+#   ConvNeXt 解码器(--decoder convnext)          + torchvision
+#   LPIPS 感知损失/指标(可选,缺失自动用 MSE)     + lpips
+#   冻结 SD-VAE 主干(--vae sd)                    + diffusers transformers accelerate
+#   真扩散 img2img / SD-VAE 往返攻击               + diffusers transformers accelerate
+#   真 Real-ESRGAN 超分攻击(可选,缺失用 bicubic) + realesrgan
+#
+# 即:只跑 CPU 冒烟(tiny VAE + cnn 解码器)仅需 torch;其余均为按功能可选。
+
+# --- 必需:深度水印推理/训练的最小依赖 ---
+torch>=2.0
+
+# --- 可选:ConvNeXt 解码器(VINE CustomConvNeXt 路线)---
+torchvision>=0.15
+
+# --- 可选:LPIPS 感知损失(缺失时训练自动只用 MSE,不报错)---
+lpips>=0.1.4
+
+# --- 可选:冻结 SD-VAE 主干 + 真扩散/VAE 往返攻击(缺失时用 tiny VAE 与 regen 代理攻击)---
+diffusers>=0.27
+transformers>=4.30
+accelerate>=0.20
+
+# --- 可选:真 Real-ESRGAN 超分攻击(缺失时 superres 用 PIL bicubic 回退)---
+# realesrgan>=0.3
+
+# --- 可选:更快的 RS 纠错(SWE 自带纯 Python RS/Hamming/重复码,无此库也能运行)---
+# reedsolo>=1.7
