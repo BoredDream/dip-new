@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import os
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -66,9 +67,14 @@ def vae_roundtrip(img: np.ndarray, model: str = "stabilityai/sd-vae-ft-mse",
 # --------------------------------------------------------------------------- #
 def diffusion_img2img(img: np.ndarray, strength: float = 0.3, prompt: str = "",
                       steps: int = 25, guidance: float = 7.5,
-                      model: str = "runwayml/stable-diffusion-v1-5",
+                      model: str = "stable-diffusion-v1-5/stable-diffusion-v1-5",
                       device: Optional[str] = None) -> np.ndarray:
-    """扩散 img2img 再生成。strength = "重绘多少",0.1(轻)->0.8(重)。需要 diffusers。"""
+    """扩散 img2img 再生成。strength = "重绘多少",0.1(轻)->0.8(重)。需要 diffusers。
+
+    默认模型用社区重托管的 SD1.5(原 `runwayml/stable-diffusion-v1-5` 已被 HF 下架);
+    可用环境变量 ``SD_IMG2IMG_MODEL`` 覆盖。
+    """
+    model = os.environ.get("SD_IMG2IMG_MODEL", model)
     if strength <= 0:
         return to_uint8(img)
     try:

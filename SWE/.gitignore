@@ -4,11 +4,18 @@ __pycache__/
 .ipynb_checkpoints/
 .pytest_cache/
 .DS_Store
+.venv/
+venv/
 
 # 训练产物 / 大文件
 checkpoints/
 *.pth
 *.ckpt
+
+# 下载/生成的数据集(不入库)
+data/div2k/
+data/eval20/
+DIV2K_*/
 
 # 实验输出(保留目录结构,忽略生成的图/表)
 results/figures/*.png

@@ -23,7 +23,12 @@ from matplotlib.colors import LogNorm
 __all__ = [
     "save_records_csv", "plot_robustness_table", "plot_strength_sweep",
     "plot_tradeoff", "plot_tamper_panel", "plot_frequency_survival",
+    "plot_ablation", "ABLATION_TIERS",
 ]
+
+#: 改进版 DwtDct 的消融四档,按 默认 → +多频带 → +纹理 → +JND 递进(方案 §4.8 图4)。
+#: 档名须与 scripts/07 的 adapters 键一致。
+ABLATION_TIERS = ["DwtDct-default", "Imp+multiband", "Imp+texture", "Imp+JND"]
 
 
 def save_records_csv(records, path: str) -> None:
@@ -147,6 +152,47 @@ def plot_frequency_survival(strengths: Sequence[float], rel_disturb: np.ndarray,
     axR.set_title(f"Stability profile @ {lab} (mildest = most realistic attack)")
     axR.legend(fontsize=8); axR.grid(alpha=0.3, which="both")
 
+    fig.tight_layout(); fig.savefig(path, dpi=150); plt.close(fig)
+
+
+def plot_ablation(records, path: str, tiers: Optional[Sequence[str]] = None,
+                  focus_attack: str = "regen_surrogate") -> None:
+    """消融曲线(方案 §4.8 图4):默认 DwtDct → +多频带 → +纹理 → +JND 的逐档增益。
+
+    x = 四档(按 ABLATION_TIERS 顺序);y = 平均比特准确率。两条线:
+      * "all attacks"   —— 所有攻击×强度的均值(综合鲁棒性);
+      * focus_attack    —— 主战场(默认再生成代理 regen_surrogate)的均值。
+    只画 records 中真实存在的档,缺档跳过(不报错)。
+    """
+    tiers = list(tiers or ABLATION_TIERS)
+    present = [t for t in tiers if any(r.method == t for r in records)]
+    if len(present) < 2:
+        return  # 档数不足,无意义
+
+    def _mean(tier, attack=None):
+        vals = [r.bit_acc_mean for r in records if r.method == tier
+                and r.attack != "none" and (attack is None or r.attack == attack)]
+        return float(np.mean(vals)) if vals else np.nan
+
+    x = np.arange(len(present))
+    y_all = [_mean(t) for t in present]
+    y_focus = [_mean(t, focus_attack) for t in present]
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.plot(x, y_all, marker="o", lw=2, label="all attacks (mean)")
+    if not all(np.isnan(y_focus)):
+        ax.plot(x, y_focus, marker="s", lw=2, ls="--",
+                label=f"{focus_attack} (mean)")
+    for xi, yv in zip(x, y_all):
+        if not np.isnan(yv):
+            ax.annotate(f"{yv:.3f}", (xi, yv), textcoords="offset points",
+                        xytext=(0, 8), ha="center", fontsize=8)
+    ax.axhline(0.5, color="gray", ls=":", lw=1, label="random (0.5)")
+    ax.set_xticks(x); ax.set_xticklabels(present, rotation=15, ha="right")
+    ax.set_ylabel("bit accuracy (mean)")
+    ax.set_ylim(0.4, 1.02)
+    ax.set_title("Ablation: default DwtDct -> +multiband -> +texture -> +JND")
+    ax.legend(fontsize=8); ax.grid(alpha=0.3)
     fig.tight_layout(); fig.savefig(path, dpi=150); plt.close(fig)
 
 

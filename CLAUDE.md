@@ -2,8 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> ⚠️ **分支差异**:本文件描述的是 `test` 分支的工程结构(主代码在 `SWE/`)。`master` 分支是另一套较早的
-> `en-water/` 单文件实现,二者结构不同——确认 `git branch --show-current` 后再动手。
+> ⚠️ **分支差异**:本文件描述的是 `test` / `test1` 分支的工程结构(主代码在 `SWE/`,二者结构一致;
+> 当前工作分支通常是 `test1`)。`master` 分支是另一套较早的 `en-water/` 单文件实现,结构不同——
+> 确认 `git branch --show-current` 后再动手。
 
 ## 这个项目是什么
 
@@ -19,6 +20,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **算法取舍铁律**(贯穿全工程):以实施方案为目标蓝本;**算法对不上时以 guetzli / VINE 两个真实项目为准**;
 缺失的实验自行补齐。
+
+**当前进度**(按实施方案第八节 P1–P4 里程碑):**P1–P4 主链路已打通**。
+- **P1 频带诊断**:`swe/eval/diagnose.py` + `scripts/09` + `results/diagnose/freq_survival.png`。
+- **P2 主创新 `ImprovedDwtDct`**(`swe/watermark/improved_dwtdct.py`):多低频带(默认 #1–7)QIM + 纹理自适应
+  + Watson JND,合成步长 `Δ_eff=δ0·texture_gain·jnd_weight·luminance_mask`,三开关可独立消融;
+  自适应步长只用嵌入后稳定统计量(块均值=DC、非载体高频能量)→ 盲提取干净准确率=1.0(`tests/test_improved_dwtdct.py`)。
+- **P3 对比阶梯 + 消融四档**:`scripts/07` adapters = SpreadSpec(下界)/ DwtDct-default / Imp+multiband /
+  Imp+texture / Imp+JND(主角)/ DCT-QIM-JPEG / Deep-Latent(上界,`--include-deep`)→ `results/attack_suite.csv`。
+- **P4 图表**:`scripts/08` 出鲁棒表 / 强度曲线 / 攻防权衡 / **消融曲线**(`swe/eval/plots.py::plot_ablation`,
+  档名见 `ABLATION_TIERS`);分析见 `docs/EXPERIMENTS.md` §6 与 `docs/EVALUATION.md` §2.2。
+
+- **真扩散攻击(本地 GPU)**:`scripts/07 --ai-img2img` 用本地 SD1.5 img2img 跑 held-out 再生成
+  (`swe/attacks/ai.py::diffusion_img2img`,默认模型 `stable-diffusion-v1-5/stable-diffusion-v1-5`,可用
+  环境变量 `SD_IMG2IMG_MODEL` 覆盖)→ `results/attack_suite_ai.csv` + `sweep_diffusion_img2img.png`。
+
+**诚实口径(已含真扩散结论)**:消融逐档抬升(0.65→0.76→0.82,JND 档鲁棒性持平、换的是可见性)是针对
+**压缩/模糊/CPU 代理**的;**真扩散 img2img 下所有 QIM 类(默认+改进三档+DCT-QIM-JPEG)在 strength=0.1 即集体
+跌到 ~0.5(死),只有 Deep-Latent 幸存 ~0.84**(真 held-out,tiny 模型没见过真扩散)。即改进版增益对低通退化成立、
+对真生成式重绘通杀——这正是"为何仍需深度水印"的硬证据。绝对数值仍 PoC(tiny-VAE/3 图),论文级需冻结 SD-VAE
+充分训练 + ~100 张 DIV2K/COCO。详见 `docs/EXPERIMENTS.md §6/§6.1`、`docs/EVALUATION.md §2.2/§4`。
+
+> 本机依赖装在 `SWE/.venv`(系统 Python 为 PEP 668 externally-managed);跑脚本用 `.venv/bin/python …`。
+> torch 为 **CUDA 版**(`cu124`,RTX 4060 可用);SD1.5 权重已缓存到 `~/.cache/huggingface`(~5GB)。
 
 ## 常用命令
 

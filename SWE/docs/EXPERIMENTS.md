@@ -8,7 +8,7 @@
 
 ```bash
 pip install -r requirements.txt          # 经典链路
-python -m pytest tests/ -q               # 期望:39 passed
+python -m pytest tests/ -q               # 期望:60 passed(含 test_improved_dwtdct 10 项)
 ```
 
 ---
@@ -63,21 +63,75 @@ python scripts/05_train_deep_watermark.py --data-dir /path/to/DIV2K \
        --steps 20000 --batch-size 8 --device cuda
 ```
 
-## 6. 全套实验 + 三张核心图(脚本 07/08)
+## 6. 对比阶梯 + 消融四档 + 核心图(脚本 07/08)
+
+`07` 按实施方案 §3.2/§六 的**对比阶梯**组织(下界<改进前<改进版<上界)并内置改进版**消融四档**:
+
+| 适配器键 | 角色 | 配置 |
+|---|---|---|
+| `SpreadSpec` | FF 式扩频(**下界**) | 整图 DCT 加性,α=6 |
+| `DwtDct-default` | 经典 DwtDct(**改进前**=消融档0) | 中频 #18,单带 |
+| `Imp+multiband` | 消融档1 | 低频 #1–7 多频带重复 |
+| `Imp+texture` | 消融档2 | +纹理自适应 |
+| `Imp+JND` | **主角**(=消融档3) | +Watson JND |
+| `DCT-QIM-JPEG` | JPEG 域核心基线 | Q50,repeat=4 |
+| `Deep-Latent` | 深度潜空间(**上界**) | 冻结 SD-VAE + CNN,GPU 在 DIV2K 训练,`--include-deep` |
 
 ```bash
-python scripts/07_run_attack_suite.py --include-deep --n-images 4
+python scripts/05_train_deep_watermark.py --smoke      # 先出深度 ckpt(上界基线)
+python scripts/07_run_attack_suite.py --include-deep --n-images 10
 python scripts/08_make_report_figures.py
 ```
 **产出**:`results/attack_suite.csv` 与 `results/figures/` 下:
-- `robustness_table.png`：方法×攻击 比特准确率热表;
-- `sweep_<attack>.png`：各攻击的强度衰减曲线(标 0.5 随机基线);
-- `tradeoff.png`：攻防权衡(横轴画面改变量、纵轴 BER,标"水印死但图还像"的危险区)。
+- `robustness_table.png`:方法×攻击 比特准确率热表;
+- `sweep_<attack>.png`:各攻击的强度衰减曲线(标 0.5 随机基线);
+- `tradeoff.png`:攻防权衡(横轴画面改变量、纵轴 BER,标"水印死但图还像"的危险区);
+- `ablation.png`:**消融曲线**(默认→+多频带→+纹理→+JND 的逐档增益)。
 
-**预期结论(以图表与 `06`/`07` 实测自动判定为准,不预设)**:经典 DCT-QIM / DWT-SVD **抗 JPEG/压缩类攻击强**;
-而 `regen_surrogate` 是**纯 CPU 代理(模糊+重采样+JPEG+噪声),强度有限,实测下经典水印仍扛得住(留存 ~0.9+)**,
-因此**冒烟阶段"经典抗压缩、深度抗再生成"的互补差距并不明显**(`06` 会如实判定深度 vs 经典"不明显")。
-要真正拉开"深度 > 经典"的差距,需 **真扩散 img2img(GPU)或冻结 SD-VAE 充分训练** —— 代理攻击只给下界。
+**实测结果(10 张样图冒烟,以 CSV/图为准;数值随抽样波动)**:
+- **消融逐档抬升**(全攻击均值):`DwtDct-default 0.65 → +multiband 0.76 → +texture 0.82 → +JND 0.81`。
+  即"多低频带 + 纹理自适应"带来主要鲁棒性增益;**JND 档鲁棒性基本持平**——符合预期:**JND 主要换的是可见性**
+  (PSNR≈49 dB),而非鲁棒性。
+- **再生成战场**(`regen_surrogate`,strength=0.2):`DwtDct-default≈0.52(死)` → `Imp+JND≈0.82`,改进版显著抬升;
+  `DCT-QIM-JPEG≈0.55(死)`——它是 JPEG 域基线、对再生成无招;`Deep-Latent` 全强度稳定 **~0.92–0.95**(上界)。
+- **不可见性**:改进版 PSNR≈49 dB / SSIM≈0.997,远高于 `SpreadSpec`(31 dB / 0.86)——后者虽对该代理攻击鲁棒,
+  但**以可见性为代价**;在相同画质下改进版完胜默认 DwtDct(见 `tradeoff.png`)。
+
+**诚实口径(勿夸大)**:`regen_surrogate` 是**纯 CPU 代理(模糊+重采样+JPEG+噪声)**,且深度水印的攻击层
+入环训练与该代理高度同源(近似 train/test 同分布),故 `Deep-Latent` 在该代理下的"全程稳定"含乐观成分。
+真扩散 img2img 的结果见下。
+
+### 6.1 真扩散 img2img 攻击(本地 SD1.5 / GPU,held-out)
+
+```bash
+python scripts/07_run_attack_suite.py --include-deep --ai-img2img \
+       --data-dir data/eval20 --n-images 20 --out results/attack_suite_ai.csv
+# 出图(单独命名,不覆盖 §6 的图):sweep_diffusion_img2img.png / robustness_table_ai.png
+```
+用本地 Stable Diffusion 1.5 img2img(strength∈{0,0.1,0.2,0.3},25 步,fp16,RTX 4060)做**真·再生成攻击**。
+**真正的 held-out**:深度模型用冻结 SD-VAE + CNN 解码器 + GPU 在 **DIV2K(100 张,与 22 张测试图不重叠)**上训练,
+攻击层只见过 模糊/噪声/缩放/VAE,**从未见过真扩散**。实测(20 张 held-out 图):
+
+| 方法 (diffusion_img2img acc) | s=0.1 | s=0.2 | s=0.3 |
+|---|---|---|---|
+| **Deep-Latent(上界)** | **0.96** | **0.95** | **0.92** |
+| SpreadSpec(下界,31dB 可见) | 0.68 | 0.59 | 0.57 |
+| Imp+JND / Imp+texture / Imp+multiband | ≈0.50 | ≈0.50 | ≈0.50 |
+| DwtDct-default | 0.50 | 0.51 | 0.51 |
+| DCT-QIM-JPEG | 0.53 | 0.56 | 0.52 |
+
+**关键结论(诚实且重要)**:
+1. **真扩散下,所有 QIM 类水印(默认 + 改进三档 + DCT-QIM-JPEG)在 strength=0.1 就集体跌到 ~0.5(死)**
+   ——印证 Zhao et al.(NeurIPS 2024)"像素/变换域隐形水印可被再生成证明性移除"。
+2. **改进版相对默认的优势,在真扩散下消失**:真 img2img 连低频内容都重写,把低频带嵌入也一起洗掉。
+   即**改进版的增益是针对压缩/模糊/低通型退化(含 CPU 代理)的,不是针对真生成式重绘的**——这正是"为何还需要
+   深度水印"的硬证据。
+3. **只有深度水印幸存**(真扩散 0.92–0.96,且是正经训练的真 held-out,无泄漏),清晰兑现"深度抗再生成"。
+   深度模型 clean_acc=0.978(泛化好),但**画质代价明显:PSNR≈23dB / SSIM≈0.72**,远不如经典(49–66dB)
+   ——鲁棒性换可见性。
+
+> SD 权重首次下载约 5GB(已缓存到 `~/.cache/huggingface`,再跑命中本地);
+> 模型 ID 可用环境变量 `SD_IMG2IMG_MODEL` 覆盖。
 
 ---
 

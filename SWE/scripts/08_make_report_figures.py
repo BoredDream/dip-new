@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""脚本 08:由实验 CSV 生成三张核心图表(模块五)。
+"""脚本 08:由实验 CSV 生成核心图表(模块五)。
 
 读取 results/attack_suite.csv,生成:
   1. results/figures/robustness_table.png   鲁棒性总表(方法 × 攻击)
   2. results/figures/sweep_<attack>.png      各攻击的强度扫描曲线
   3. results/figures/tradeoff.png            攻防权衡曲线(危险区)
+  4. results/figures/ablation.png            消融曲线(默认→+多频带→+纹理→+JND)
 用法: python scripts/08_make_report_figures.py [csv路径]
 """
 import csv
@@ -14,7 +15,8 @@ import sys
 import _bootstrap  # noqa: F401
 
 from swe.eval.runner import Record, records_to_table
-from swe.eval.plots import plot_robustness_table, plot_strength_sweep, plot_tradeoff
+from swe.eval.plots import (plot_robustness_table, plot_strength_sweep,
+                            plot_tradeoff, plot_ablation)
 import config
 
 
@@ -61,7 +63,14 @@ def main(csv_path=None):
     p3 = os.path.join(fig_dir, "tradeoff.png")
     plot_tradeoff(records, p3)
     print(f"[OK] 攻防权衡曲线: {p3}")
-    print("\n三张核心图表已生成于 results/figures/。")
+
+    p4 = os.path.join(fig_dir, "ablation.png")
+    plot_ablation(records, p4)
+    if os.path.exists(p4):
+        print(f"[OK] 消融曲线: {p4}")
+    else:
+        print("[--] 消融曲线已跳过(CSV 中缺少消融四档,请用 scripts/07 重新跑批)")
+    print("\n核心图表已生成于 results/figures/。")
 
 
 if __name__ == "__main__":
